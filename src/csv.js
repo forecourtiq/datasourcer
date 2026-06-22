@@ -19,6 +19,7 @@ const COLUMNS = [
   ['linkedinPeople', 'LinkedIn People Search'],
   ['contactPageSearch', 'Contact Page Search'],
   ['targetRoles', 'Target Roles'],
+  ['officers', 'CH Officers (name · role)'],
 ];
 
 export function toCsv(records) {
@@ -40,6 +41,9 @@ function flatten(r) {
     linkedinPeople: primary.linkedinPeople || '',
     contactPageSearch: company.contactPageSearch || '',
     targetRoles: Array.isArray(c.targetRoles) ? c.targetRoles.join('; ') : '',
+    officers: Array.isArray(r.officers)
+      ? r.officers.map((o) => `${o.name}${o.role ? ' · ' + o.role : ''}`).join('; ')
+      : '',
   };
 }
 

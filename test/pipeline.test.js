@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { parseDealers, buildSearchUrl } from '../src/autotrader.js';
-import { checkWebsiteFooter } from '../src/verify.js';
-import { buildContactSearches, TARGET_ROLES } from '../src/linkedin.js';
+import { checkWebsiteFooter, fetchOfficers } from '../src/verify.js';
+import { buildContactSearches, buildPersonSearches, TARGET_ROLES } from '../src/linkedin.js';
 import { toCsv } from '../src/csv.js';
 
 test('buildSearchUrl encodes postcode and radius', () => {
@@ -86,6 +86,47 @@ test('buildContactSearches targets all sales roles and both names', () => {
   assert.match(decodeURIComponent(c.primary.googleProfiles), /Bassetts \(South Wales\) Limited/);
   assert.match(decodeURIComponent(c.primary.googleProfiles), /Dealer Principal/);
   assert.equal(c.perRole.length, TARGET_ROLES.length);
+});
+
+test('fetchOfficers returns current officers, naturalises names, drops resigned/corporate', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    url: 'https://api',
+    text: async () =>
+      JSON.stringify({
+        items: [
+          {
+            name: 'SMITH, John David',
+            officer_role: 'director',
+            appointed_on: '2015-01-01',
+            occupation: 'Company Director',
+            links: { officer: { appointments: '/officers/abc123/appointments' } },
+          },
+          { name: 'JONES, Sarah', officer_role: 'director', resigned_on: '2020-05-01' }, // resigned -> dropped
+          { name: 'CORPORATE NOMINEES LIMITED', officer_role: 'secretary' }, // corporate -> dropped
+        ],
+      }),
+  });
+  try {
+    const officers = await fetchOfficers('01234567', 'key');
+    assert.equal(officers.length, 1);
+    assert.equal(officers[0].naturalName, 'John David Smith');
+    assert.equal(officers[0].role, 'director');
+    assert.match(officers[0].profileUrl, /\/officers\/abc123\/appointments$/);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('buildPersonSearches scopes a named person by company', () => {
+  const s = buildPersonSearches({ personName: 'John Smith', companyName: 'Bassetts (South Wales) Limited', location: 'Bridgend' });
+  assert.match(decodeURIComponent(s.googleProfile), /site:linkedin\.com\/in "John Smith"/);
+  assert.match(decodeURIComponent(s.googleProfile), /Bassetts \(South Wales\) Limited/);
+  assert.match(decodeURIComponent(s.linkedinPeople), /John Smith/);
+  assert.match(decodeURIComponent(s.googleGeneral), /email OR contact OR phone/);
+  assert.equal(buildPersonSearches({}), null);
 });
 
 test('toCsv produces a header and escapes commas/quotes', () => {
