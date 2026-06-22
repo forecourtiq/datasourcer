@@ -15,7 +15,6 @@
           <p class="tagline">Find UK dealerships · verify they're trading · surface sales-management contacts</p>
         </div>
       </div>
-      <div id="chBadge" class="badge badge-warn" title="Companies House API status">Companies House: checking…</div>
     </header>
 
     <main>
@@ -69,9 +68,10 @@
       <details class="help">
         <summary>How verification &amp; contact-finding works</summary>
         <ul>
-          <li><strong>Trading check:</strong> we fetch each dealer's website and look for their name in the footer, and cross-check Companies House for an <em>active</em> company. Confidence reflects how many signals agreed.</li>
+          <li><strong>Trading check:</strong> we fetch each dealer's website and look for their name in the footer, read off the registered company name &amp; number, then look that company up on the <em>free public Companies House website</em> (no API key) to confirm it's <em>active</em>. Confidence reflects how many signals agreed.</li>
+          <li><strong>Companies House:</strong> we also give you a one-click <em>Google search</em> of the company (name + number + "companies house") and a Companies House search link, so there's always a manual cross-check.</li>
+          <li><strong>Officers:</strong> current directors are scraped from the company's public Companies House officers page, and each gets their own LinkedIn + Google search.</li>
           <li><strong>Contacts:</strong> LinkedIn forbids scraping and never exposes emails/phones, so we generate precise, ready-to-click LinkedIn &amp; Google searches targeting Dealer Principals, Heads of Business, Sales Managers/Directors, MDs, Operations Directors, etc. Open them to read off names, then pull email/phone from the dealer's own contact page.</li>
-          <li><strong>Companies House:</strong> requires a free API key set as <code>CH_API_KEY</code> on the server. Without it, the trading check relies on the website footer only.</li>
         </ul>
       </details>
     </main>

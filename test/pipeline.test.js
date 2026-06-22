@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { parseDealers, buildSearchUrl } from '../src/autotrader.js';
-import { checkWebsiteFooter, fetchOfficers } from '../src/verify.js';
+import { checkWebsiteFooter, fetchOfficers, checkCompaniesHouse, buildCompanyGoogleSearch } from '../src/verify.js';
 import { buildContactSearches, buildPersonSearches, TARGET_ROLES } from '../src/linkedin.js';
 import { toCsv } from '../src/csv.js';
 
@@ -88,36 +88,79 @@ test('buildContactSearches targets all sales roles and both names', () => {
   assert.equal(c.perRole.length, TARGET_ROLES.length);
 });
 
-test('fetchOfficers returns current officers, naturalises names, drops resigned/corporate', async () => {
+test('fetchOfficers scrapes public CH officers page, drops resigned/corporate, normalises names', async () => {
   const origFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({
-    ok: true,
-    status: 200,
-    url: 'https://api',
-    text: async () =>
-      JSON.stringify({
-        items: [
-          {
-            name: 'SMITH, John David',
-            officer_role: 'director',
-            appointed_on: '2015-01-01',
-            occupation: 'Company Director',
-            links: { officer: { appointments: '/officers/abc123/appointments' } },
-          },
-          { name: 'JONES, Sarah', officer_role: 'director', resigned_on: '2020-05-01' }, // resigned -> dropped
-          { name: 'CORPORATE NOMINEES LIMITED', officer_role: 'secretary' }, // corporate -> dropped
-        ],
-      }),
-  });
+  // Mirrors the public find-and-update officers page structure.
+  const html = `<html><body>
+    <div class="appointment-1">
+      <h2><a href="/officers/abc123/appointments" id="officer-name-1">SMITH, John David</a></h2>
+      <dl><dt>Role</dt><dd id="officer-role-1">Director</dd>
+          <dt>Appointed on</dt><dd>1 January 2015</dd></dl>
+    </div>
+    <div class="appointment-2">
+      <h2><a href="/officers/def456/appointments" id="officer-name-2">JONES, Sarah</a></h2>
+      <dl><dt>Role</dt><dd id="officer-role-2">Director</dd>
+          <dt>Status</dt><dd>Resigned on 1 May 2020</dd></dl>
+    </div>
+    <div class="appointment-3">
+      <h2><a href="/officers/ghi789/appointments" id="officer-name-3">CORPORATE NOMINEES LIMITED</a></h2>
+      <dl><dt>Role</dt><dd id="officer-role-3">Secretary</dd></dl>
+    </div>
+  </body></html>`;
+  globalThis.fetch = async () => ({ ok: true, status: 200, url: 'https://ch', text: async () => html });
   try {
-    const officers = await fetchOfficers('01234567', 'key');
-    assert.equal(officers.length, 1);
+    const officers = await fetchOfficers('01234567');
+    assert.equal(officers.length, 1, 'resigned + corporate excluded');
     assert.equal(officers[0].naturalName, 'John Smith'); // middle name dropped
-    assert.equal(officers[0].role, 'director');
+    assert.equal(officers[0].role, 'Director');
     assert.match(officers[0].profileUrl, /\/officers\/abc123\/appointments$/);
   } finally {
     globalThis.fetch = origFetch;
   }
+});
+
+test('checkCompaniesHouse resolves status from the public profile page', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('/search/companies')) {
+      return {
+        ok: true, status: 200, url: u,
+        text: async () =>
+          `<html><body><ul id="results">
+            <li><a href="/company/01234567">BASSETTS (SOUTH WALES) LIMITED</a></li>
+          </ul></body></html>`,
+      };
+    }
+    // company profile page
+    return {
+      ok: true, status: 200, url: u,
+      text: async () =>
+        `<html><body>
+          <p id="company-name">BASSETTS (SOUTH WALES) LIMITED</p>
+          <dd id="company-status">Active</dd>
+        </body></html>`,
+    };
+  };
+  try {
+    const ch = await checkCompaniesHouse({ query: 'Bassetts (South Wales) Limited' });
+    assert.equal(ch.found, true);
+    assert.equal(ch.companyNumber, '01234567');
+    assert.equal(ch.isActive, true);
+    assert.match(ch.status, /active/);
+    assert.match(ch.profileUrl, /\/company\/01234567$/);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('buildCompanyGoogleSearch includes quoted name, number and "companies house"', () => {
+  const url = buildCompanyGoogleSearch('Bassetts (South Wales) Limited', '01234567');
+  const q = decodeURIComponent(url);
+  assert.match(q, /google\.com\/search/);
+  assert.match(q, /"Bassetts \(South Wales\) Limited"/);
+  assert.match(q, /01234567/);
+  assert.match(q, /companies house/);
 });
 
 test('buildPersonSearches scopes a named person by company', () => {

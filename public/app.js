@@ -6,25 +6,9 @@ const csvBtn = document.getElementById('csvBtn');
 const statusEl = document.getElementById('status');
 const progressEl = document.getElementById('progress');
 const tbody = document.getElementById('resultsBody');
-const chBadge = document.getElementById('chBadge');
 
 let records = [];
 let evtSource = null;
-
-// Show whether Companies House is configured server-side.
-fetch('/api/health')
-  .then((r) => r.json())
-  .then((h) => {
-    if (h.companiesHouseConfigured) {
-      chBadge.textContent = 'Companies House: connected';
-      chBadge.className = 'badge badge-ok';
-    } else {
-      chBadge.textContent = 'Companies House: not configured';
-      chBadge.className = 'badge badge-warn';
-      chBadge.title = 'Set CH_API_KEY on the server to enable active-company checks';
-    }
-  })
-  .catch(() => {});
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -104,10 +88,17 @@ function addRow(r) {
   const tr = document.createElement('tr');
 
   const trading = tradingPill(r.tradingLikely);
+  // Always offer manual cross-check links (Google + CH search), plus the
+  // matched company profile when we resolved one.
+  const searchLinks = `<span class="ch-links">
+      ${r.companyGoogleSearch ? `<a href="${esc(r.companyGoogleSearch)}" target="_blank" rel="noopener">Google</a>` : ''}
+      ${r.companiesHouseSearchUrl ? `<a href="${esc(r.companiesHouseSearchUrl)}" target="_blank" rel="noopener">CH search</a>` : ''}
+    </span>`;
   const chCell = r.companyNumber
     ? `<a href="${esc(r.companiesHouseUrl)}" target="_blank" rel="noopener">${esc(r.registeredName || r.companyNumber)}</a>
-       <span class="conf">${esc(r.companyStatus || '')} · ${esc(r.companyNumber)}</span>`
-    : '<span class="muted">no match</span>';
+       <span class="conf">${esc(r.companyStatus || '')} · ${esc(r.companyNumber)}</span>
+       ${searchLinks}`
+    : `<span class="muted">no match</span> ${searchLinks}`;
 
   const websiteCell = r.website
     ? `<a href="${esc(r.website)}" target="_blank" rel="noopener">${esc(hostname(r.website))}</a>

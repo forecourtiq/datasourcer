@@ -13,7 +13,7 @@ import { buildContactSearches, buildPersonSearches } from './linkedin.js';
 import { sleep } from './http.js';
 
 export async function runPipeline(
-  { postcode, radius = 200, maxPages = 1, maxDealers = 50, chApiKey, throttleMs = 600 },
+  { postcode, radius = 200, maxPages = 1, maxDealers = 50, throttleMs = 600 },
   onEvent = () => {},
 ) {
   onEvent({ type: 'status', message: `Searching AutoTrader for dealers near ${postcode} (within ${radius} miles)…` });
@@ -53,7 +53,7 @@ export async function runPipeline(
     // Verify trading status.
     let verification;
     try {
-      verification = await verifyDealer(dealer, { chApiKey });
+      verification = await verifyDealer(dealer);
     } catch (err) {
       verification = { error: String(err), verdict: { tradingLikely: null, confidence: 'unknown', reason: 'verification error' } };
     }
@@ -99,6 +99,10 @@ export async function runPipeline(
         (verification.companiesHouse && verification.companiesHouse.status) || null,
       companiesHouseUrl:
         (verification.companiesHouse && verification.companiesHouse.profileUrl) || null,
+      companiesHouseSearchUrl:
+        (verification.companiesHouse && verification.companiesHouse.searchUrl) || null,
+      companyGoogleSearch:
+        (verification.companiesHouse && verification.companiesHouse.googleSearch) || null,
       nameInFooter: verification.footer ? verification.footer.nameInFooter : false,
       footerMatch: verification.footer ? verification.footer.matchedText : null,
       tradingLikely: verification.verdict.tradingLikely,
