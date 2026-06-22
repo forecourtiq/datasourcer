@@ -15,6 +15,7 @@ const COLUMNS = [
   ['companyNumber', 'Company Number'],
   ['companyStatus', 'Companies House Status'],
   ['companiesHouseUrl', 'Companies House URL'],
+  ['companyGoogleSearch', 'Company Google Search'],
   ['googleProfiles', 'LinkedIn Profiles (Google)'],
   ['linkedinPeople', 'LinkedIn People Search'],
   ['contactPageSearch', 'Contact Page Search'],

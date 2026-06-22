@@ -117,6 +117,7 @@ tr.empty td { text-align: center; color: var(--muted); padding: 2rem; }
 .pill-no { background: rgba(239,68,68,0.16); color: var(--red); }
 .pill-maybe { background: rgba(245,158,11,0.16); color: var(--amber); }
 .conf { font-size: 0.72rem; color: var(--muted); display: block; margin-top: 0.2rem; }
+.ch-links { display: inline-flex; gap: 0.6rem; margin-top: 0.25rem; font-size: 0.78rem; }
 
 a { color: #7cb0ff; text-decoration: none; }
 a:hover { text-decoration: underline; }

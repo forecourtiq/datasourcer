@@ -1,15 +1,17 @@
 // Verify a dealership is still trading by two independent signals:
 //   1. Their own website footer mentions their (trading) name and/or a
 //      registered company name / company number.
-//   2. Companies House lists a matching company as "active" (not dissolved).
+//   2. The FREE public Companies House website lists a matching company as
+//      "active" (not dissolved) — scraped, no API key required.
 //
-// Companies House offers a free REST API. Set CH_API_KEY in the environment.
-// Get a key at https://developer.company-information.service.gov.uk/
+// We read the company name + number from the footer, then look the company up
+// on https://find-and-update.company-information.service.gov.uk and also emit a
+// plain Google search of the company for manual cross-checking.
 
 import * as cheerio from 'cheerio';
 import { fetchText } from './http.js';
 
-const CH_BASE = 'https://api.company-information.service.gov.uk';
+const CH_WEB = 'https://find-and-update.company-information.service.gov.uk';
 
 // ---------------------------------------------------------------------------
 // 1. Website footer check
@@ -72,130 +74,213 @@ export async function checkWebsiteFooter(website, dealerName) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Companies House check
+// 2. Companies House check — scrapes the FREE public website (no API key).
+//    https://find-and-update.company-information.service.gov.uk
 // ---------------------------------------------------------------------------
 
 /**
- * Search Companies House for a company matching the dealer/registered name and
- * report whether it's active.
+ * Resolve a company on the public Companies House website. Prefers a company
+ * number scraped from the footer (authoritative); otherwise searches by name.
  */
-export async function checkCompaniesHouse(query, apiKey) {
+export async function checkCompaniesHouse({ companyNumber, query } = {}) {
   const result = {
-    queried: query,
-    available: Boolean(apiKey),
+    queried: query || companyNumber || null,
     found: false,
     companyName: null,
     companyNumber: null,
     status: null, // active | dissolved | liquidation | ...
     isActive: false,
     profileUrl: null,
+    searchUrl: query
+      ? `${CH_WEB}/search/companies?q=${encodeURIComponent(query)}`
+      : null,
   };
-  if (!apiKey || !query) return result;
 
-  const url = `${CH_BASE}/search/companies?q=${encodeURIComponent(query)}&items_per_page=5`;
-  const auth = 'Basic ' + Buffer.from(`${apiKey}:`).toString('base64');
-  const res = await fetchText(url, {
-    timeoutMs: 15000,
-    headers: { Authorization: auth, Accept: 'application/json' },
-  });
-  if (!res.ok || !res.body) return result;
-
-  let data;
-  try {
-    data = JSON.parse(res.body);
-  } catch {
-    return result;
+  // 1) If the footer gave us a number, look it up directly.
+  if (companyNumber) {
+    const byNumber = await lookupCompanyPublic(companyNumber);
+    if (byNumber.found) return { ...result, ...byNumber };
   }
-  const items = data.items || [];
-  if (!items.length) return result;
 
-  // Prefer the best name match, favouring active companies.
-  const ranked = items
-    .map((it) => ({ it, score: similarity(query, it.title || '') + (it.company_status === 'active' ? 0.15 : 0) }))
-    .sort((a, b) => b.score - a.score);
-  const best = ranked[0].it;
-
-  result.found = true;
-  result.companyName = best.title || null;
-  result.companyNumber = best.company_number || null;
-  result.status = best.company_status || null;
-  result.isActive = best.company_status === 'active';
-  result.profileUrl = best.company_number
-    ? `https://find-and-update.company-information.service.gov.uk/company/${best.company_number}`
-    : null;
+  // 2) Otherwise search by name and take the best match.
+  if (query) {
+    const match = await searchCompanyPublic(query);
+    if (match) {
+      const profile = await lookupCompanyPublic(match.companyNumber);
+      if (profile.found) return { ...result, ...profile };
+      return { ...result, found: true, ...match };
+    }
+  }
   return result;
 }
 
-/**
- * Run both checks and produce an overall "still trading" verdict.
- */
-export async function verifyDealer(dealer, { chApiKey } = {}) {
-  const footer = await checkWebsiteFooter(dealer.website, dealer.name);
+/** Fetch + parse a company profile page from the public CH website. */
+async function lookupCompanyPublic(number) {
+  const base = { found: false };
+  if (!number) return base;
+  const profileUrl = `${CH_WEB}/company/${encodeURIComponent(number)}`;
+  const res = await fetchText(profileUrl, { timeoutMs: 18000 });
+  if (!res.ok || !res.body) return base;
 
-  // Query Companies House with the most specific name we have.
-  const chQuery = footer.registeredNameOnSite || dealer.name;
-  const ch = await checkCompaniesHouse(chQuery, chApiKey);
+  const $ = cheerio.load(res.body);
+  const companyName =
+    norm($('#company-name').first().text()) ||
+    norm($('h1.heading-xlarge').first().text()) ||
+    null;
+  if (!companyName) return base; // likely a 404/error page
 
-  // If the site gave us a company number, that's authoritative — fetch it.
-  let chByNumber = null;
-  if (footer.companyNumberOnSite && chApiKey) {
-    chByNumber = await lookupCompanyByNumber(footer.companyNumberOnSite, chApiKey);
-  }
-  const chFinal = chByNumber && chByNumber.found ? chByNumber : ch;
+  const status =
+    norm($('#company-status').first().text()).toLowerCase() ||
+    extractStatusFromDl($) ||
+    null;
 
-  // Pull the company's current officers (directors etc.) so we can hunt for
-  // them individually on LinkedIn / Google.
-  let officers = [];
-  if (chFinal.found && chFinal.companyNumber && chApiKey) {
-    officers = await fetchOfficers(chFinal.companyNumber, chApiKey);
-  }
+  return {
+    found: true,
+    companyName,
+    companyNumber: number,
+    status,
+    isActive: /active/.test(status || ''),
+    profileUrl,
+  };
+}
 
-  const verdict = decideTradingStatus(footer, chFinal);
-  return { footer, companiesHouse: chFinal, officers, verdict };
+/** Search the public CH website by name; returns the best {companyName, companyNumber}. */
+async function searchCompanyPublic(query) {
+  const url = `${CH_WEB}/search/companies?q=${encodeURIComponent(query)}`;
+  const res = await fetchText(url, { timeoutMs: 18000 });
+  if (!res.ok || !res.body) return null;
+
+  const $ = cheerio.load(res.body);
+  const candidates = [];
+  $('a[href^="/company/"]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    const m = href.match(/^\/company\/([A-Z0-9]{6,8})\b/i);
+    if (!m) return;
+    const name = norm($(el).text());
+    if (!name) return;
+    candidates.push({ companyName: name, companyNumber: m[1] });
+  });
+  if (!candidates.length) return null;
+
+  // Rank by name similarity to the query.
+  candidates.sort((a, b) => similarity(query, b.companyName) - similarity(query, a.companyName));
+  return candidates[0];
+}
+
+// Some profile pages render status inside the overview definition list rather
+// than a dedicated #company-status node.
+function extractStatusFromDl($) {
+  let status = null;
+  $('dt').each((_, el) => {
+    if (status) return;
+    if (/company status/i.test($(el).text())) {
+      status = norm($(el).next('dd').text()).toLowerCase() || null;
+    }
+  });
+  return status;
 }
 
 /**
- * Fetch the current (not-resigned) officers for a company from Companies House.
- * Names come back as "LASTNAME, Firstname Middlenames"; we normalise to a
- * natural "Firstname Lastname" form for searching.
- * @returns {Promise<Array<{name, naturalName, role, appointedOn, occupation, profileUrl}>>}
+ * Run the website-footer check + public Companies House lookup and produce a
+ * "still trading" verdict plus a plain Google search of the company.
  */
-export async function fetchOfficers(number, apiKey) {
-  const url = `${CH_BASE}/company/${encodeURIComponent(number)}/officers?register_view=false&items_per_page=50&order_by=appointed_on`;
-  const auth = 'Basic ' + Buffer.from(`${apiKey}:`).toString('base64');
-  const res = await fetchText(url, {
-    timeoutMs: 15000,
-    headers: { Authorization: auth, Accept: 'application/json' },
-  });
-  if (!res.ok || !res.body) return [];
+export async function verifyDealer(dealer) {
+  const footer = await checkWebsiteFooter(dealer.website, dealer.name);
 
-  let data;
-  try {
-    data = JSON.parse(res.body);
-  } catch {
-    return [];
+  const query = footer.registeredNameOnSite || dealer.name;
+  const ch = await checkCompaniesHouse({
+    companyNumber: footer.companyNumberOnSite,
+    query,
+  });
+
+  // Pull current officers (directors etc.) from the public website so we can
+  // hunt for them individually on LinkedIn / Google.
+  let officers = [];
+  if (ch.found && ch.companyNumber) {
+    officers = await fetchOfficers(ch.companyNumber);
   }
 
-  const items = (data.items || [])
-    .filter((o) => !o.resigned_on) // current officers only
-    .map((o) => {
-      const apptId = o.links && o.links.officer && o.links.officer.appointments;
-      return {
-        name: o.name || null,
-        naturalName: naturaliseOfficerName(o.name),
-        role: o.officer_role || null,
-        appointedOn: o.appointed_on || null,
-        occupation: o.occupation || null,
-        profileUrl: apptId
-          ? `https://find-and-update.company-information.service.gov.uk${apptId}`
-          : null,
-      };
-    })
-    // Corporate officers (other companies acting as director) aren't people —
-    // drop the obvious ones so we don't generate junk searches.
-    .filter((o) => o.naturalName && !/\b(LIMITED|LTD|PLC|LLP|SECRETARIES|NOMINEES)\b/i.test(o.name));
+  // A plain Google search of the company, as requested.
+  const googleSearch = buildCompanyGoogleSearch(
+    ch.companyName || footer.registeredNameOnSite || dealer.name,
+    ch.companyNumber || footer.companyNumberOnSite,
+  );
 
-  return items;
+  const verdict = decideTradingStatus(footer, ch);
+  return { footer, companiesHouse: { ...ch, googleSearch }, officers, verdict };
+}
+
+/** A standard Google search for the company (name + number + "companies house"). */
+export function buildCompanyGoogleSearch(name, number) {
+  if (!name && !number) return null;
+  const parts = [];
+  if (name) parts.push(`"${name}"`);
+  if (number) parts.push(number);
+  parts.push('companies house');
+  return `https://www.google.com/search?q=${encodeURIComponent(parts.join(' '))}`;
+}
+
+/**
+ * Fetch the current (not-resigned) officers for a company by scraping the
+ * public CH officers page. Names render as "LASTNAME, Firstname Middlenames";
+ * we normalise to "Firstname Lastname" (first forename only) for searching.
+ * @returns {Promise<Array<{name, naturalName, role, profileUrl}>>}
+ */
+export async function fetchOfficers(number) {
+  if (!number) return [];
+  const url = `${CH_WEB}/company/${encodeURIComponent(number)}/officers`;
+  const res = await fetchText(url, { timeoutMs: 18000 });
+  if (!res.ok || !res.body) return [];
+
+  const $ = cheerio.load(res.body);
+  const officers = [];
+  const seen = new Set();
+
+  // Each appointment links to /officers/<id>/appointments with the name as text.
+  $('a[href^="/officers/"]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    if (!/\/officers\/[^/]+\/appointments/.test(href)) return;
+    const rawName = norm($(el).text());
+    if (!rawName) return;
+
+    // Skip corporate officers (companies acting as director/secretary).
+    if (/\b(LIMITED|LTD|PLC|LLP|SECRETARIES|NOMINEES)\b/i.test(rawName)) return;
+
+    // Climb to the appointment container to read role + resignation status.
+    const card = $(el).closest('div, li');
+    const cardText = norm(card.text());
+    if (/resigned on/i.test(cardText)) return; // current officers only
+
+    const role = extractOfficerRole(card, $);
+
+    const naturalName = naturaliseOfficerName(rawName);
+    const key = naturalName.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    officers.push({
+      name: rawName,
+      naturalName,
+      role,
+      profileUrl: `${CH_WEB}${href}`,
+    });
+  });
+
+  return officers;
+}
+
+function extractOfficerRole(card, $) {
+  // Role appears in a <dd id="officer-role-N"> or after a "Role" <dt>.
+  const byId = norm(card.find('[id^="officer-role-"]').first().text());
+  if (byId) return byId;
+  let role = null;
+  card.find('dt').each((_, dt) => {
+    if (role) return;
+    if (/^role$/i.test(norm($(dt).text()))) {
+      role = norm($(dt).next('dd').text()) || null;
+    }
+  });
+  return role;
 }
 
 // "SMITH, John David" -> "John Smith" (drop middle names for better search recall)
@@ -214,29 +299,6 @@ function titleCase(s) {
   return s
     .toLowerCase()
     .replace(/\b([a-z])/g, (m) => m.toUpperCase());
-}
-
-async function lookupCompanyByNumber(number, apiKey) {
-  const url = `${CH_BASE}/company/${encodeURIComponent(number)}`;
-  const auth = 'Basic ' + Buffer.from(`${apiKey}:`).toString('base64');
-  const res = await fetchText(url, {
-    timeoutMs: 15000,
-    headers: { Authorization: auth, Accept: 'application/json' },
-  });
-  if (!res.ok) return { found: false };
-  try {
-    const c = JSON.parse(res.body);
-    return {
-      found: true,
-      companyName: c.company_name || null,
-      companyNumber: c.company_number || number,
-      status: c.company_status || null,
-      isActive: c.company_status === 'active',
-      profileUrl: `https://find-and-update.company-information.service.gov.uk/company/${c.company_number || number}`,
-    };
-  } catch {
-    return { found: false };
-  }
 }
 
 function decideTradingStatus(footer, ch) {
