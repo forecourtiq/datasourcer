@@ -42,7 +42,7 @@ Without a key the trading check still works, but relies on the website footer al
 | Website footer | The dealer's own site | Looks for the dealer/trading name and a `Registered in England… company number 01234567` style line. |
 | Trading status | Companies House REST API | Treats `active` as trading; `dissolved`/`liquidation` as not. Combined with the footer signal into a confidence score. |
 | Contacts (roles) | Generated search URLs | We **do not** scrape LinkedIn (see below). The app builds Google `site:linkedin.com/in` searches and LinkedIn people searches scoped to the company name + target roles, plus a "contact page / email" search. |
-| Officers | Companies House `/company/{n}/officers` | Lists the company's **current** officers (resigned and obvious corporate officers filtered out), normalises `LASTNAME, Firstname` → `Firstname Lastname`, and generates a LinkedIn people search, a `site:linkedin.com/in` Google search, and an email/contact search for each named person. Requires `CH_API_KEY`. |
+| Officers | Companies House `/company/{n}/officers` | Lists the company's **current** officers (resigned and obvious corporate officers filtered out), normalises `LASTNAME, Firstname Middle` → `Firstname Lastname` (middle names dropped for better search recall), and generates a LinkedIn people search, a `site:linkedin.com/in` Google search, and an email/contact search for each named person. Requires `CH_API_KEY`. |
 
 ### Why we don't scrape LinkedIn for emails/phones
 

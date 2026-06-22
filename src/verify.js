@@ -198,13 +198,13 @@ export async function fetchOfficers(number, apiKey) {
   return items;
 }
 
-// "SMITH, John David" -> "John David Smith"
+// "SMITH, John David" -> "John Smith" (drop middle names for better search recall)
 function naturaliseOfficerName(name) {
   if (!name) return null;
   const parts = name.split(',');
   if (parts.length === 2) {
     const last = titleCase(parts[0].trim());
-    const first = parts[1].trim();
+    const first = parts[1].trim().split(/\s+/)[0] || ''; // first forename only
     return `${first} ${last}`.replace(/\s+/g, ' ').trim();
   }
   return name.trim();

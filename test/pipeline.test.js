@@ -112,7 +112,7 @@ test('fetchOfficers returns current officers, naturalises names, drops resigned/
   try {
     const officers = await fetchOfficers('01234567', 'key');
     assert.equal(officers.length, 1);
-    assert.equal(officers[0].naturalName, 'John David Smith');
+    assert.equal(officers[0].naturalName, 'John Smith'); // middle name dropped
     assert.equal(officers[0].role, 'director');
     assert.match(officers[0].profileUrl, /\/officers\/abc123\/appointments$/);
   } finally {
