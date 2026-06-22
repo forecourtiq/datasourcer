@@ -143,8 +143,77 @@ export async function verifyDealer(dealer, { chApiKey } = {}) {
   }
   const chFinal = chByNumber && chByNumber.found ? chByNumber : ch;
 
+  // Pull the company's current officers (directors etc.) so we can hunt for
+  // them individually on LinkedIn / Google.
+  let officers = [];
+  if (chFinal.found && chFinal.companyNumber && chApiKey) {
+    officers = await fetchOfficers(chFinal.companyNumber, chApiKey);
+  }
+
   const verdict = decideTradingStatus(footer, chFinal);
-  return { footer, companiesHouse: chFinal, verdict };
+  return { footer, companiesHouse: chFinal, officers, verdict };
+}
+
+/**
+ * Fetch the current (not-resigned) officers for a company from Companies House.
+ * Names come back as "LASTNAME, Firstname Middlenames"; we normalise to a
+ * natural "Firstname Lastname" form for searching.
+ * @returns {Promise<Array<{name, naturalName, role, appointedOn, occupation, profileUrl}>>}
+ */
+export async function fetchOfficers(number, apiKey) {
+  const url = `${CH_BASE}/company/${encodeURIComponent(number)}/officers?register_view=false&items_per_page=50&order_by=appointed_on`;
+  const auth = 'Basic ' + Buffer.from(`${apiKey}:`).toString('base64');
+  const res = await fetchText(url, {
+    timeoutMs: 15000,
+    headers: { Authorization: auth, Accept: 'application/json' },
+  });
+  if (!res.ok || !res.body) return [];
+
+  let data;
+  try {
+    data = JSON.parse(res.body);
+  } catch {
+    return [];
+  }
+
+  const items = (data.items || [])
+    .filter((o) => !o.resigned_on) // current officers only
+    .map((o) => {
+      const apptId = o.links && o.links.officer && o.links.officer.appointments;
+      return {
+        name: o.name || null,
+        naturalName: naturaliseOfficerName(o.name),
+        role: o.officer_role || null,
+        appointedOn: o.appointed_on || null,
+        occupation: o.occupation || null,
+        profileUrl: apptId
+          ? `https://find-and-update.company-information.service.gov.uk${apptId}`
+          : null,
+      };
+    })
+    // Corporate officers (other companies acting as director) aren't people —
+    // drop the obvious ones so we don't generate junk searches.
+    .filter((o) => o.naturalName && !/\b(LIMITED|LTD|PLC|LLP|SECRETARIES|NOMINEES)\b/i.test(o.name));
+
+  return items;
+}
+
+// "SMITH, John David" -> "John Smith" (drop middle names for better search recall)
+function naturaliseOfficerName(name) {
+  if (!name) return null;
+  const parts = name.split(',');
+  if (parts.length === 2) {
+    const last = titleCase(parts[0].trim());
+    const first = parts[1].trim().split(/\s+/)[0] || ''; // first forename only
+    return `${first} ${last}`.replace(/\s+/g, ' ').trim();
+  }
+  return name.trim();
+}
+
+function titleCase(s) {
+  return s
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m) => m.toUpperCase());
 }
 
 async function lookupCompanyByNumber(number, apiKey) {

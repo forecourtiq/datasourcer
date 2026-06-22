@@ -91,6 +91,28 @@ export function buildContactSearches({ dealerName, registeredName, location } = 
   };
 }
 
+/**
+ * Build LinkedIn / Google searches for a specific named person (e.g. a
+ * Companies House officer), scoped by the company name to disambiguate.
+ * @param {object} args
+ * @param {string} args.personName  natural name, e.g. "John Smith"
+ * @param {string} [args.companyName]
+ * @param {string} [args.location]
+ */
+export function buildPersonSearches({ personName, companyName, location } = {}) {
+  if (!personName) return null;
+  const co = companyName ? `"${companyName}"` : '';
+  return {
+    googleProfile: google(`site:linkedin.com/in "${personName}" ${co}`.trim()),
+    linkedinPeople: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(
+      `${personName} ${companyName || ''}`.trim(),
+    )}`,
+    googleGeneral: google(
+      `"${personName}" ${co} ${location || ''} (email OR contact OR phone)`.trim(),
+    ),
+  };
+}
+
 function google(q) {
   return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
 }

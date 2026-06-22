@@ -126,6 +126,11 @@ a:hover { text-decoration: underline; }
 .role-links summary { cursor: pointer; color: var(--muted); font-size: 0.8rem; }
 .role-links a { display: block; margin: 0.2rem 0; }
 
+.officer { display: flex; align-items: baseline; gap: 0.4rem; margin: 0.25rem 0; flex-wrap: wrap; }
+.officer-name { font-weight: 600; font-size: 0.83rem; }
+.officer-actions { display: inline-flex; gap: 0.5rem; }
+.officer-actions a { display: inline; margin: 0; }
+
 .help { margin-top: 1.5rem; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 1rem; }
 .help summary { cursor: pointer; padding: 0.5rem 0; font-weight: 600; }
 .help ul { margin: 0 0 0.8rem; padding-left: 1.2rem; color: var(--muted); }

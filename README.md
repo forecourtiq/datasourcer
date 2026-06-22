@@ -5,6 +5,7 @@ A web app that runs a UK car-dealership lead-sourcing workflow end to end:
 1. **Find dealerships** via AutoTrader's dealer search (by postcode + radius).
 2. **Verify they're still trading** by (a) fetching their website and checking the footer for their name / registered company details, and (b) cross-checking **Companies House** for an *active* company.
 3. **Surface sales-management contacts** by generating precise, ready-to-click **LinkedIn & Google searches** for Dealer Principals, Heads of Business, Sales Managers/Directors, Managing Directors, Operations Directors, and related roles.
+4. **Look up the company's current officers** (directors) from Companies House and generate a per-person LinkedIn + Google search for each, so you can research the named individuals directly.
 
 Results stream into a live table in the browser and can be exported to **CSV**.
 
@@ -40,7 +41,8 @@ Without a key the trading check still works, but relies on the website footer al
 | Dealer search | `https://www.autotrader.co.uk/cars/dealers/search` | Parses the JSON embedded in the page first, falls back to scraping the rendered cards. AutoTrader changes its markup periodically and uses anti-bot measures — see *Limitations*. |
 | Website footer | The dealer's own site | Looks for the dealer/trading name and a `Registered in England… company number 01234567` style line. |
 | Trading status | Companies House REST API | Treats `active` as trading; `dissolved`/`liquidation` as not. Combined with the footer signal into a confidence score. |
-| Contacts | Generated search URLs | We **do not** scrape LinkedIn (see below). The app builds Google `site:linkedin.com/in` searches and LinkedIn people searches scoped to the company name + target roles, plus a "contact page / email" search. |
+| Contacts (roles) | Generated search URLs | We **do not** scrape LinkedIn (see below). The app builds Google `site:linkedin.com/in` searches and LinkedIn people searches scoped to the company name + target roles, plus a "contact page / email" search. |
+| Officers | Companies House `/company/{n}/officers` | Lists the company's **current** officers (resigned and obvious corporate officers filtered out), normalises `LASTNAME, Firstname Middle` → `Firstname Lastname` (middle names dropped for better search recall), and generates a LinkedIn people search, a `site:linkedin.com/in` Google search, and an email/contact search for each named person. Requires `CH_API_KEY`. |
 
 ### Why we don't scrape LinkedIn for emails/phones
 

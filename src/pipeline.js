@@ -9,7 +9,7 @@
 
 import { searchDealers, findDealerWebsite } from './autotrader.js';
 import { verifyDealer } from './verify.js';
-import { buildContactSearches } from './linkedin.js';
+import { buildContactSearches, buildPersonSearches } from './linkedin.js';
 import { sleep } from './http.js';
 
 export async function runPipeline(
@@ -58,15 +58,31 @@ export async function runPipeline(
       verification = { error: String(err), verdict: { tradingLikely: null, confidence: 'unknown', reason: 'verification error' } };
     }
 
-    // Contact search links.
+    const registeredName =
+      (verification.companiesHouse && verification.companiesHouse.companyName) ||
+      (verification.footer && verification.footer.registeredNameOnSite) ||
+      null;
+
+    // Contact search links (role-based, company-wide).
     const contacts = buildContactSearches({
       dealerName: dealer.name,
-      registeredName:
-        (verification.companiesHouse && verification.companiesHouse.companyName) ||
-        (verification.footer && verification.footer.registeredNameOnSite) ||
-        null,
+      registeredName,
       location: dealer.location,
     });
+
+    // Per-officer searches from Companies House current directors.
+    const officers = (verification.officers || []).map((o) => ({
+      name: o.naturalName,
+      role: o.role,
+      appointedOn: o.appointedOn,
+      occupation: o.occupation,
+      companiesHouseUrl: o.profileUrl,
+      searches: buildPersonSearches({
+        personName: o.naturalName,
+        companyName: registeredName || dealer.name,
+        location: dealer.location,
+      }),
+    }));
 
     const record = {
       name: dealer.name,
@@ -89,6 +105,7 @@ export async function runPipeline(
       confidence: verification.verdict.confidence,
       verdictReason: verification.verdict.reason,
       contacts,
+      officers,
     };
     results.push(record);
 

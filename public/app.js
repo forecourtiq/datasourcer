@@ -123,6 +123,26 @@ function addRow(r) {
     .map((pr) => `<a href="${esc(pr.google)}" target="_blank" rel="noopener">${esc(pr.role)}</a>`)
     .join('');
 
+  const officers = Array.isArray(r.officers) ? r.officers : [];
+  const officerLinks = officers
+    .map((o) => {
+      const s = o.searches || {};
+      const role = o.role ? ` · ${esc(o.role)}` : '';
+      return `<div class="officer">
+        <span class="officer-name">${esc(o.name)}</span><span class="muted">${role}</span>
+        <span class="officer-actions">
+          ${s.linkedinPeople ? `<a href="${esc(s.linkedinPeople)}" target="_blank" rel="noopener">in</a>` : ''}
+          ${s.googleProfile ? `<a href="${esc(s.googleProfile)}" target="_blank" rel="noopener">🔎</a>` : ''}
+          ${s.googleGeneral ? `<a href="${esc(s.googleGeneral)}" target="_blank" rel="noopener">✉️</a>` : ''}
+          ${o.companiesHouseUrl ? `<a href="${esc(o.companiesHouseUrl)}" target="_blank" rel="noopener">CH</a>` : ''}
+        </span>
+      </div>`;
+    })
+    .join('');
+  const officerBlock = officers.length
+    ? `<details class="role-links"><summary>Officers from Companies House (${officers.length})</summary>${officerLinks}</details>`
+    : '';
+
   const contactsCell = `
     <div class="linkcol">
       <a href="${esc(primary.googleProfiles)}" target="_blank" rel="noopener">🔎 Google profiles</a>
@@ -132,7 +152,8 @@ function addRow(r) {
     <details class="role-links">
       <summary>By role (${perRole.length})</summary>
       ${roleLinks}
-    </details>`;
+    </details>
+    ${officerBlock}`;
 
   tr.innerHTML = `
     <td>
