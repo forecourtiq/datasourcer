@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Datasourcer — Dealership Finder</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🚗</span>
+        <div>
+          <h1>Datasourcer</h1>
+          <p class="tagline">Find UK dealerships · verify they're trading · surface sales-management contacts</p>
+        </div>
+      </div>
+      <div id="chBadge" class="badge badge-warn" title="Companies House API status">Companies House: checking…</div>
+    </header>
+
+    <main>
+      <form id="searchForm" class="controls">
+        <div class="field">
+          <label for="postcode">Postcode</label>
+          <input id="postcode" name="postcode" type="text" value="EX23 8AR" required autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="radius">Radius (miles)</label>
+          <select id="radius" name="radius">
+            <option>10</option><option>25</option><option>50</option>
+            <option>100</option><option selected>200</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="maxPages">Pages</label>
+          <input id="maxPages" name="maxPages" type="number" min="1" max="10" value="1" />
+        </div>
+        <div class="field">
+          <label for="maxDealers">Max dealers</label>
+          <input id="maxDealers" name="maxDealers" type="number" min="1" max="200" value="50" />
+        </div>
+        <button id="goBtn" type="submit">Find dealerships</button>
+        <button id="csvBtn" type="button" disabled>Download CSV</button>
+      </form>
+
+      <section class="statusbar">
+        <div id="status" class="status">Ready.</div>
+        <div id="progress" class="progress"></div>
+      </section>
+
+      <section class="tablewrap">
+        <table id="results">
+          <thead>
+            <tr>
+              <th>Dealer</th>
+              <th>Location</th>
+              <th>Trading?</th>
+              <th>Companies House</th>
+              <th>Website</th>
+              <th>Find contacts (LinkedIn)</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody">
+            <tr class="empty"><td colspan="6">No results yet — run a search.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <details class="help">
+        <summary>How verification &amp; contact-finding works</summary>
+        <ul>
+          <li><strong>Trading check:</strong> we fetch each dealer's website and look for their name in the footer, and cross-check Companies House for an <em>active</em> company. Confidence reflects how many signals agreed.</li>
+          <li><strong>Contacts:</strong> LinkedIn forbids scraping and never exposes emails/phones, so we generate precise, ready-to-click LinkedIn &amp; Google searches targeting Dealer Principals, Heads of Business, Sales Managers/Directors, MDs, Operations Directors, etc. Open them to read off names, then pull email/phone from the dealer's own contact page.</li>
+          <li><strong>Companies House:</strong> requires a free API key set as <code>CH_API_KEY</code> on the server. Without it, the trading check relies on the website footer only.</li>
+        </ul>
+      </details>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

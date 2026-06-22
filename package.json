@@ -1,0 +1,19 @@
+{
+  "name": "datasourcer",
+  "version": "1.0.0",
+  "description": "Find UK car dealerships via AutoTrader, verify they're still trading (website footer + Companies House), and generate targeted LinkedIn searches for sales-management contacts.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "express": "^4.21.2"
+  }
+}

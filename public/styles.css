@@ -1,0 +1,134 @@
+:root {
+  --bg: #0f1419;
+  --panel: #1a2230;
+  --panel-2: #222d3d;
+  --border: #2c3a4f;
+  --text: #e6edf3;
+  --muted: #9fb0c3;
+  --accent: #3b82f6;
+  --accent-2: #2563eb;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 0.85rem; }
+.logo { font-size: 2rem; }
+h1 { font-size: 1.35rem; margin: 0; }
+.tagline { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+.badge {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge-ok { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.4); }
+.badge-warn { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.4); }
+
+main { padding: 1.25rem 1.5rem 3rem; max-width: 1400px; margin: 0 auto; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.9rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.field input, .field select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.95rem;
+}
+.field input[type="number"] { width: 90px; }
+#postcode { width: 160px; text-transform: uppercase; }
+
+button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.62rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--accent-2); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+#csvBtn { background: var(--panel-2); border: 1px solid var(--border); }
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 0.6rem;
+}
+.status { color: var(--muted); font-size: 0.9rem; }
+.progress { font-size: 0.85rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+thead th {
+  text-align: left;
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+}
+tbody td { padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+tbody tr:hover { background: rgba(59,130,246,0.06); }
+tr.empty td { text-align: center; color: var(--muted); padding: 2rem; }
+
+.dealer-name { font-weight: 600; }
+.muted { color: var(--muted); font-size: 0.82rem; }
+
+.pill { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; }
+.pill-yes { background: rgba(34,197,94,0.16); color: var(--green); }
+.pill-no { background: rgba(239,68,68,0.16); color: var(--red); }
+.pill-maybe { background: rgba(245,158,11,0.16); color: var(--amber); }
+.conf { font-size: 0.72rem; color: var(--muted); display: block; margin-top: 0.2rem; }
+
+a { color: #7cb0ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.linkcol a { display: inline-block; margin: 0 0.5rem 0.3rem 0; font-size: 0.82rem; }
+.role-links { margin-top: 0.4rem; }
+.role-links summary { cursor: pointer; color: var(--muted); font-size: 0.8rem; }
+.role-links a { display: block; margin: 0.2rem 0; }
+
+.help { margin-top: 1.5rem; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 1rem; }
+.help summary { cursor: pointer; padding: 0.5rem 0; font-weight: 600; }
+.help ul { margin: 0 0 0.8rem; padding-left: 1.2rem; color: var(--muted); }
+.help code { background: var(--panel-2); padding: 0.1rem 0.35rem; border-radius: 4px; }
+
+.row-error { color: var(--red); font-size: 0.82rem; }
